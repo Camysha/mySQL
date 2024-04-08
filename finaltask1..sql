@@ -1,4 +1,4 @@
-DELIMITER $$
+DELIMITER //
 CREATE PROCEDURE times(seconds INT)
 BEGIN
     DECLARE days INT default 0;
@@ -21,7 +21,7 @@ BEGIN
     END WHILE;
 
 SELECT days, hours, minutes, seconds;
-END $$
+END //
 DELIMITER ;
 
 CALL times(123456);

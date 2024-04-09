@@ -257,3 +257,96 @@ order by lastname;
 SELECT media_id, count(id) FROM likes
 group by media_id;
 
+/*
+Задача 1.  Создайте процедуру, которая выберет для одного пользователя 5 пользователей 
+в случайной комбинации, которые удовлетворяют хотя бы одному критерию:1) из одного города 2) 
+состоят в одной группе3) друзья друзей
+*/
+
+/*
+-- Создание процедуры поиска друзей 1 порядка:
+DROP PROCEDURE IF EXISTS get_random_users;
+DELIMITER //
+CREATE PROCEDURE get_random_users(for_user_id BIGINT)
+BEGIN
+	SELECT firstname, lastname FROM friend_requests AS fr LEFT JOIN users ON users.id = fr.target_user_id
+	WHERE initiator_user_id  = for_user_id AND status = 'approved'
+	UNION
+	SELECT firstname, lastname FROM friend_requests AS fr LEFT JOIN users ON users.id = fr.initiator_user_id
+	WHERE target_user_id  = for_user_id AND status = 'approved' ORDER BY RAND();
+END //
+DELIMITER ;
+
+call get_random_users(1);
+*/
+
+DROP PROCEDURE IF EXISTS get_random_users;
+DELIMITER //
+CREATE PROCEDURE get_random_users(for_user_id BIGINT)
+BEGIN
+	WITH Friends AS (SELECT target_user_id AS friend_id FROM friend_requests AS fr 
+		WHERE initiator_user_id  = for_user_id AND status = 'approved'
+		UNION
+		SELECT initiator_user_id FROM friend_requests AS fr 
+		WHERE target_user_id  = for_user_id AND status = 'approved')
+    SELECT target_user_id AS friend_id FROM friend_requests AS fr 
+	WHERE initiator_user_id  != for_user_id AND initiator_user_id IN (SELECT * FROM Friends)  AND status = 'approved'
+	UNION
+	SELECT initiator_user_id FROM friend_requests AS fr 
+	WHERE target_user_id  != for_user_id AND target_user_id IN (SELECT * FROM Friends) AND status = 'approved'
+    UNION
+    SELECT p.user_id FROM profiles AS p WHERE hometown = (SELECT hometown FROM profiles 
+    WHERE p.user_id = for_user_id) AND p.user_id != for_user_id
+    UNION
+    SELECT uc.user_id FROM users_communities AS uc WHERE uc.community_id IN (SELECT community_id FROM users_communities 
+    WHERE user_id = for_user_id) AND uc.user_id != for_user_id
+    ORDER BY RAND();
+END //
+DELIMITER ;
+
+call get_random_users(1);
+
+/*
+Задача 2.  Создание функции, вычисляющей коэффициент популярности пользователя 
+(по заявкам на дружбу – таблица friend_requests)
+количество заппросов к юзеру / количество запросов от него
+*/
+/*
+-- Создание функции:
+DROP FUNCTION IF EXISTS function_name;
+DELIMITER //
+CREATE FUNCTION function_name(parameter_list)
+RETURNS type [characteristic]
+BEGIN
+  statements;
+  statements;
+  statements;
+
+RETURN … ;
+END//
+DELIMITER ;
+
+-- Вызов функции:
+SELECT function_name(argument_list);
+*/
+
+-- Создание функции:
+DROP FUNCTION IF EXISTS get_friends_qf;
+DELIMITER //
+CREATE FUNCTION get_friends_qf(for_user_id BIGINT)
+RETURNS FLOAT READS SQL DATA
+BEGIN
+	DECLARE from_user INT;
+    DECLARE to_user INT;
+    DECLARE qf FLOAT;
+    SET to_user  = (SELECT COUNT(*) FROM friend_requests WHERE target_user_id = for_user_id);
+    SET from_user  = (SELECT COUNT(*) FROM friend_requests WHERE initiator_user_id = for_user_id);
+    IF(to_user = 0) THEN SET qf = 99999;
+    ELSE SET qf = from_user / to_user;
+    END IF;
+ 
+RETURN qf;
+END//
+DELIMITER ;
+
+SELECT get_friends_qf(2);
